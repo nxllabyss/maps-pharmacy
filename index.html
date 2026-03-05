@@ -1,188 +1,239 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
+  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Pharmacy Map</title>
-
-  <!-- Leaflet CSS via CDN (external dependency) -->
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha256-sA+e2k0G8w7r7m+Xw2b0u8p4Qb4pZb1s0f5p0bXvCk0="
-    crossorigin=""
-  />
-
   <style>
-    /* Styling choices:
-       - Use a simple, modern font (Arial).
-       - Keep design clean and minimal.
-       - Header centered with vertical margin.
-       - Map fills most of the viewport (90% height) and full width.
-       - Popups readable by increasing font size and using the same font.
-    */
+    /* Basic page reset and font */
     html, body {
       height: 100%;
       margin: 0;
+      padding: 0;
       font-family: Arial, Helvetica, sans-serif;
-      background: #f7f7f7;
+      background: #f7f9fc; /* simple, clean background */
       color: #222;
     }
 
-    header {
-      text-align: center; /* Header centered */
-      margin: 18px 0;     /* Margin at top and bottom */
+    /* Page layout: centered header, map, small footer */
+    .page {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      align-items: stretch;
     }
 
-    h1 {
-      font-weight: 600;
+    header {
+      text-align: center;
+      padding: 18px 12px;
+      margin: 8px 0;
+    }
+
+    header h1 {
       margin: 0;
       font-size: 1.6rem;
+      font-weight: 600;
+      color: #0b3954;
+      letter-spacing: 0.3px;
     }
 
-    /* Map container fills 90% of the viewport height and full width */
+    /* Map container fills most of the viewport as requested (90% of viewport height).
+       This ensures the map is responsive and occupies the main visible area. */
     #map {
       width: 100%;
-      height: 90vh; /* 90% of viewport height */
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-      border-radius: 4px;
-      overflow: hidden;
-    }
-
-    /* Make leaflet popups more readable */
-    .leaflet-popup-content {
-      font-size: 16px; /* readable font size for popups */
-      line-height: 1.4;
-      font-family: Arial, Helvetica, sans-serif;
-    }
-
-    /* Small legend / info text at the bottom (overlaying the map) */
-    .map-legend {
-      position: absolute;
-      left: 50%;
-      transform: translateX(-50%);
-      bottom: 14px;
-      background: rgba(255,255,255,0.95);
-      padding: 6px 10px;
+      height: 90vh; /* map fills 90% of the viewport height */
+      box-sizing: border-box;
+      border: 1px solid rgba(11,57,84,0.08);
       border-radius: 6px;
-      font-size: 13px;
-      box-shadow: 0 1px 6px rgba(0,0,0,0.12);
-      pointer-events: none; /* prevents blocking map interactions */
+      margin: 0 auto;
+      /* On very narrow screens allow it to remain full width */
+      max-width: 1400px;
     }
 
-    /* Responsive adjustments */
-    @media (max-width: 480px) {
-      h1 { font-size: 1.2rem; }
-      .leaflet-popup-content { font-size: 15px; }
-      .map-legend { font-size: 12px; padding: 5px 8px; }
+    /* Footer / legend */
+    footer {
+      text-align: center;
+      padding: 8px 12px;
+      font-size: 0.95rem;
+      color: #4a4a4a;
+    }
+
+    /* Styling for info window content when displayed */
+    .info-window {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 14px; /* readable font size for popups */
+      line-height: 1.35;
+      max-width: 260px;
+    }
+
+    .info-window .name {
+      display: block;
+      font-weight: 700;
+      margin-bottom: 6px;
+      color: #0b3b5c;
+    }
+
+    .info-window .hours {
+      font-size: 13px;
+      margin-bottom: 6px;
+      color: #1f3b4d;
+    }
+
+    .info-window .desc {
+      font-size: 13px;
+      color: #333;
+    }
+
+    /* Small responsive tweaks */
+    @media (max-width: 600px) {
+      header h1 { font-size: 1.25rem; }
+      .info-window { font-size: 13px; }
     }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Pharmacy Map</h1>
-  </header>
+  <div class="page">
+    <!-- Header -->
+    <header role="banner" aria-label="Page header">
+      <h1>Pharmacy Map</h1>
+    </header>
 
-  <!-- Map element: Leaflet will initialize here -->
-  <div id="map" role="region" aria-label="Map showing pharmacy locations in the city"></div>
+    <!-- Map element: the Google Maps API will render the map here -->
+    <main>
+      <div id="map" role="region" aria-label="Map showing pharmacies"></div>
+    </main>
 
-  <!-- Legend / info text explaining markers -->
-  <div class="map-legend" aria-hidden="true">Markers represent pharmacy locations</div>
+    <!-- Small footer/legend -->
+    <footer role="contentinfo">
+      Markers indicate pharmacies
+    </footer>
+  </div>
 
-  <!-- Leaflet JS via CDN (external dependency) -->
+  <!--
+    Google Maps JavaScript API
+    - Replace YOUR_API_KEY with your actual API key.
+    - async & defer ensure the script loads asynchronously and executes after parsing.
+    - callback=initMap will call the global initMap function below when the API is ready.
+  -->
   <script
-    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-o9N1j6kQm0Y3qzQv5X2gWk9gQ2a1b3zY1Pp6v5Q5rQg="
-    crossorigin=""
-  ></script>
+    src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=initMap"
+    async
+    defer></script>
 
   <script>
-    /* Map Initialization:
-       - Create a Leaflet map and set its view to the target city's center coordinates.
-       - Choose an appropriate zoom level for a city-wide view.
+    /*
+      JavaScript for Pharmacy Map
+      - initMap(): map initialization and marker setup (called by Google Maps API)
+      - pharmacies[]: array of pharmacy objects (name, lat/lng, hours, description)
+      - For clarity, this file contains detailed comments describing each main step.
     */
-    // Center coordinates for Tashkent, Uzbekistan
-    const cityCenter = [41.2995, 69.2401]; // latitude, longitude
-    const cityZoom = 12; // city-level zoom
 
-    // Initialize the map in the 'map' div
-    const map = L.map('map').setView(cityCenter, cityZoom);
-
-    /* Tile layer setup:
-       - Use OpenStreetMap tiles (free and widely used).
-       - Include proper attribution as required by OpenStreetMap.
-       - This configures the visual basemap for the Leaflet map.
-    */
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors',
-      maxZoom: 19,
-      tileSize: 256,
-      // No API key required for standard OpenStreetMap tiles
-    }).addTo(map);
-
-    /* Pharmacy markers creation:
-       - Define an array of pharmacies with coordinates, name, opening hours, and optional description.
-       - Only these pharmacy locations will be shown on the map as markers.
-    */
+    // 1) Data: Define an array of example pharmacy objects.
+    //    Each object contains:
+    //      - name: string shown in the info popup (bold)
+    //      - position: { lat, lng } coordinates
+    //      - hours: opening hours string
+    //      - description: optional short description
     const pharmacies = [
       {
-        name: "Central Pharmacy No.1",
-        coords: [41.2995, 69.2401],
-        hours: "08:00 - 22:00",
-        description: "Located near the city center. Walk-ins welcome."
+        name: 'Central Pharmacy',
+        position: { lat: 41.2995, lng: 69.2401 }, // center of Tashkent
+        hours: '08:00 - 22:00',
+        description: 'Located near Amir Timur Square. Large selection of medicines and staff speak English.'
       },
       {
-        name: "Amir Timur Pharmacy",
-        coords: [41.3120, 69.2790],
-        hours: "09:00 - 21:00",
-        description: "Close to Amir Timur Square."
+        name: 'Soglom Apteka',
+        position: { lat: 41.3052, lng: 69.2355 },
+        hours: '09:00 - 21:00',
+        description: 'Community pharmacy with 24/7 emergency supply on weekends.'
       },
       {
-        name: "Bek Pharmacy",
-        coords: [41.3035, 69.2310],
-        hours: "07:30 - 20:00",
-        description: "Neighborhood pharmacy with quick service."
+        name: 'Green Health Pharmacy',
+        position: { lat: 41.2928, lng: 69.2339 },
+        hours: '07:30 - 20:00',
+        description: 'Known for herbal remedies and friendly pharmacists.'
       },
       {
-        name: "University Pharmacy",
-        coords: [41.3210, 69.2600],
-        hours: "08:00 - 19:00",
-        description: "Serves university students and staff."
+        name: 'Nur Pharmacy',
+        position: { lat: 41.2959, lng: 69.2504 },
+        hours: '08:00 - 23:00',
+        description: 'Conveniently located near the metro station; accepts electronic payments.'
       }
     ];
 
-    /* Popup binding and marker creation:
-       - For each pharmacy, create a Leaflet marker at the given coordinates.
-       - Format popup HTML to show the pharmacy name in bold, opening hours, and optional description.
-       - Bind the popup to the marker so it opens when the marker is clicked.
-    */
-    pharmacies.forEach(pharmacy => {
-      // Create marker for the pharmacy
-      const marker = L.marker(pharmacy.coords).addTo(map);
+    // 2) initMap: This function is called by the Google Maps API once it finishes loading.
+    //    It:
+    //      - creates the map centered on Tashkent with zoom appropriate for a city view
+    //      - adds markers dynamically from the pharmacies array
+    //      - binds info windows to each marker so clicking a marker opens its popup
+    function initMap() {
+      // Map center coordinates (Tashkent example)
+      const tashkentCoords = { lat: 41.2995, lng: 69.2401 };
 
-      // Construct popup content: name in bold, opening hours, and optional description
-      const popupContent = `
-        <div>
-          <strong>${escapeHtml(pharmacy.name)}</strong><br/>
-          <em>Opening hours:</em> ${escapeHtml(pharmacy.hours)}<br/>
-          ${pharmacy.description ? `<div>${escapeHtml(pharmacy.description)}</div>` : ''}
-        </div>
-      `;
-
-      // Bind the popup to the marker (popup binding)
-      marker.bindPopup(popupContent, {
-        keepInView: true,
-        maxWidth: 260
+      // Map initialization:
+      // - center: set to the city's coordinates
+      // - zoom: 13 is a typical city-level zoom (street-level detail)
+      // - mapTypeControl, streetViewControl etc. are left as defaults (default controls enabled)
+      const map = new google.maps.Map(document.getElementById('map'), {
+        center: tashkentCoords,
+        zoom: 13,
+        // We intentionally keep default controls enabled (zoom, pan, mapType, etc.)
+        // to provide the user with familiar interactions.
       });
-    });
 
-    /* Utility: simple HTML-escape to avoid any accidental HTML injection in popup strings.
-       This is a lightweight safety step since content is static in this example.
+      // Single InfoWindow instance reused for all markers.
+      // Reusing a single InfoWindow is more efficient and ensures only one popup is open at a time.
+      const infoWindow = new google.maps.InfoWindow();
+
+      // Marker creation:
+      // Iterate through the pharmacies array and create a Google Maps Marker for each entry.
+      pharmacies.forEach((pharmacy) => {
+        // Create marker
+        const marker = new google.maps.Marker({
+          position: pharmacy.position,
+          map: map,
+          title: pharmacy.name
+          // You can add custom icons here if desired, e.g. icon: 'path/to/icon.png'
+        });
+
+        // Build the HTML content for the popup (info window).
+        // We use classes and inline HTML structure to control font size and readability.
+        const content = `
+          <div class="info-window" role="dialog" aria-label="${escapeHtml(pharmacy.name)} info">
+            <span class="name">${escapeHtml(pharmacy.name)}</span>
+            <div class="hours"><strong>Opening hours:</strong> ${escapeHtml(pharmacy.hours)}</div>
+            <div class="desc">${escapeHtml(pharmacy.description)}</div>
+          </div>
+        `;
+
+        // Bind click event to marker to open the info window with the prepared content.
+        marker.addListener('click', () => {
+          // Set the content of the shared InfoWindow and open it anchored to the clicked marker.
+          infoWindow.setContent(content);
+          infoWindow.open(map, marker);
+
+          // Optionally pan the map slightly so the info window is fully visible on small screens.
+          // We center the map at the marker (this can be adjusted or removed if undesired).
+          map.panTo(marker.getPosition());
+        });
+      });
+
+      // Optionally: Fit map bounds to show all markers (useful if markers spread out).
+      // Here all markers are within the same city; uncomment below to auto-fit if needed.
+      /*
+      const bounds = new google.maps.LatLngBounds();
+      pharmacies.forEach(p => bounds.extend(p.position));
+      map.fitBounds(bounds);
+      */
+    }
+
+    /*
+      Utility: Simple HTML-escaping helper to avoid injecting unintended HTML into info windows.
+      This keeps our info window content safe if any value contains special characters.
     */
-    function escapeHtml(str) {
-      if (!str) return '';
-      return String(str)
+    function escapeHtml(text) {
+      if (!text && text !== 0) return '';
+      return String(text)
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
@@ -190,14 +241,8 @@
         .replace(/'/g, '&#039;');
     }
 
-    /* Optional UX improvement:
-       - If the user opens the map on a very small device, keep the map centered on the city center
-         after orientation changes or resizes.
-    */
-    window.addEventListener('resize', function () {
-      map.setView(cityCenter, map.getZoom());
-    });
+    // Expose initMap globally for the Google Maps API callback (already defined above).
+    // Note: initMap is declared as a function in global scope; no additional export needed.
   </script>
 </body>
-
 </html>
