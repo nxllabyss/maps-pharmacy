@@ -3,409 +3,1012 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nearby Pharmacies Map</title>
+    <meta name="description" content="Find nearby pharmacies using OpenStreetMap and Leaflet.js">
+    <title>Nearby Pharmacies Finder</title>
+    
+    <!-- Leaflet.js CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    
+    <!-- Leaflet MarkerCluster CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css" />
+    
     <style>
-        /* Reset default browser styles */
+        /* ============================================
+           GLOBAL STYLES & CSS VARIABLES
+           ============================================ */
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #27ae60;
+            --accent-color: #e74c3c;
+            --light-bg: #ecf0f1;
+            --dark-bg: #2c3e50;
+            --text-light: #333;
+            --text-dark: #ecf0f1;
+            --shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            --shadow-dark: 0 4px 12px rgba(0, 0, 0, 0.4);
+            --border-radius: 12px;
+        }
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
 
-        /* Body styling - set background and font */
         body {
-            font-family: Arial, sans-serif;
-            background-color: #f5f5f5;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--light-bg);
+            color: var(--text-light);
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
 
-        /* Header styling - centered with modern appearance */
+        body.dark-mode {
+            background-color: var(--dark-bg);
+            color: var(--text-dark);
+        }
+
+        /* ============================================
+           HEADER SECTION
+           ============================================ */
         header {
+            background: linear-gradient(135deg, var(--primary-color) 0%, #34495e 100%);
+            color: white;
+            padding: 20px;
+            box-shadow: var(--shadow);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+            text-align: center;
+            font-weight: 700;
+        }
+
+        header p {
+            text-align: center;
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        /* ============================================
+           CONTROLS SECTION
+           ============================================ */
+        .controls {
+            background-color: white;
+            padding: 15px 20px;
+            box-shadow: var(--shadow);
+            display: grid;
+            grid-template-columns: 1fr auto auto auto;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            transition: background-color 0.3s ease;
+        }
+
+        body.dark-mode .controls {
+            background-color: #34495e;
+            box-shadow: var(--shadow-dark);
+        }
+
+        .search-container {
+            display: flex;
+            gap: 8px;
+            flex: 1;
+            min-width: 200px;
+        }
+
+        #pharmacy-search {
+            flex: 1;
+            padding: 10px 15px;
+            border: 2px solid #bdc3c7;
+            border-radius: var(--border-radius);
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        #pharmacy-search:focus {
+            outline: none;
+            border-color: var(--secondary-color);
+        }
+
+        body.dark-mode #pharmacy-search {
             background-color: #2c3e50;
+            color: white;
+            border-color: #555;
+        }
+
+        button {
+            padding: 10px 20px;
+            background-color: var(--secondary-color);
+            color: white;
+            border: none;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            font-size: 14px;
+        }
+
+        button:hover {
+            background-color: #229954;
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        #toggle-dark-mode {
+            background-color: #f39c12;
+        }
+
+        #toggle-dark-mode:hover {
+            background-color: #d68910;
+        }
+
+        #find-nearest-btn {
+            background-color: var(--accent-color);
+        }
+
+        #find-nearest-btn:hover {
+            background-color: #c0392b;
+        }
+
+        #location-status {
+            font-size: 12px;
+            padding: 8px 12px;
+            background-color: #d5f4e6;
+            border-radius: var(--border-radius);
+            color: #27ae60;
+            animation: fadeIn 0.3s ease;
+        }
+
+        body.dark-mode #location-status {
+            background-color: #1e5631;
+            color: #81c784;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* ============================================
+           MAP CONTAINER
+           ============================================ */
+        #map {
+            width: 100%;
+            height: calc(100vh - 280px);
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        /* ============================================
+           PHARMACY LIST PANEL
+           ============================================ */
+        .pharmacy-list-container {
+            max-height: 300px;
+            overflow-y: auto;
+            background-color: white;
+            padding: 15px;
+            box-shadow: var(--shadow);
+            transition: background-color 0.3s ease;
+        }
+
+        body.dark-mode .pharmacy-list-container {
+            background-color: #34495e;
+            box-shadow: var(--shadow-dark);
+        }
+
+        .pharmacy-list-container h3 {
+            margin-bottom: 10px;
+            color: var(--primary-color);
+        }
+
+        body.dark-mode .pharmacy-list-container h3 {
+            color: var(--text-dark);
+        }
+
+        .pharmacy-item {
+            padding: 10px;
+            margin-bottom: 8px;
+            background-color: var(--light-bg);
+            border-radius: var(--border-radius);
+            border-left: 4px solid var(--secondary-color);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        body.dark-mode .pharmacy-item {
+            background-color: #2c3e50;
+        }
+
+        .pharmacy-item:hover {
+            background-color: #e8f8f5;
+            transform: translateX(5px);
+        }
+
+        body.dark-mode .pharmacy-item:hover {
+            background-color: #1a252f;
+        }
+
+        .pharmacy-item strong {
+            display: block;
+            margin-bottom: 4px;
+            color: var(--primary-color);
+        }
+
+        body.dark-mode .pharmacy-item strong {
+            color: var(--text-dark);
+        }
+
+        .pharmacy-item-distance {
+            font-size: 12px;
+            color: #7f8c8d;
+        }
+
+        body.dark-mode .pharmacy-item-distance {
+            color: #bdc3c7;
+        }
+
+        .pharmacy-item.nearest {
+            border-left-color: var(--accent-color);
+            background-color: #fdeaea;
+        }
+
+        body.dark-mode .pharmacy-item.nearest {
+            background-color: #3d2520;
+        }
+
+        /* ============================================
+           FOOTER SECTION
+           ============================================ */
+        footer {
+            background-color: var(--primary-color);
             color: white;
             padding: 20px;
             text-align: center;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-            z-index: 10;
+            font-size: 13px;
+            line-height: 1.6;
+            box-shadow: var(--shadow);
+            margin-top: 20px;
         }
 
-        /* Header title styling */
-        h1 {
-            font-size: 28px;
-            font-weight: bold;
-            letter-spacing: 0.5px;
+        footer p {
+            margin: 5px 0;
         }
 
-        /* Container for the map - takes up most of the viewport */
-        .map-container {
-            flex: 1;
-            position: relative;
-            overflow: hidden;
-            margin: 10px;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 10px;
+            flex-wrap: wrap;
         }
 
-        /* Map element styling - fills the container */
-        #map {
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+        }
+
+        .legend-marker {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid white;
+        }
+
+        .legend-marker.user-location {
+            background-color: #3b82f6;
+        }
+
+        .legend-marker.pharmacy {
+            background-color: #22c55e;
+        }
+
+        .legend-marker.nearest {
+            background-color: #ef4444;
+        }
+
+        /* ============================================
+           LOADING ANIMATION
+           ============================================ */
+        .loading-spinner {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid rgba(0, 0, 0, 0.1);
+            border-top-color: var(--secondary-color);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* ============================================
+           POPUP STYLES (Leaflet overrides)
+           ============================================ */
+        .leaflet-popup-content-wrapper {
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+        }
+
+        .leaflet-popup-content {
+            margin: 0;
+            font-size: 13px;
+        }
+
+        .popup-title {
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 8px;
+            font-size: 15px;
+        }
+
+        .popup-info {
+            margin: 6px 0;
+            line-height: 1.4;
+        }
+
+        .popup-info strong {
+            color: var(--primary-color);
+        }
+
+        .popup-button {
             width: 100%;
-            height: 100%;
-            border-radius: 8px;
-        }
-
-        /* Footer styling - information about markers */
-        footer {
-            background-color: #34495e;
+            margin-top: 10px;
+            padding: 8px 12px;
+            background-color: var(--secondary-color);
             color: white;
-            padding: 15px;
-            text-align: center;
-            font-size: 14px;
-            box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
+            border: none;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.3s ease;
         }
 
-        /* Responsive design for smaller screens */
+        .popup-button:hover {
+            background-color: #229954;
+        }
+
+        /* ============================================
+           RESPONSIVE DESIGN
+           ============================================ */
         @media (max-width: 768px) {
-            h1 {
+            header h1 {
                 font-size: 22px;
             }
-            
-            .map-container {
-                margin: 5px;
+
+            .controls {
+                grid-template-columns: 1fr;
+                grid-auto-flow: dense;
+            }
+
+            .search-container {
+                grid-column: 1;
+            }
+
+            #map {
+                height: calc(100vh - 350px);
+            }
+
+            .pharmacy-list-container {
+                max-height: 250px;
+            }
+
+            .legend {
+                gap: 15px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            header h1 {
+                font-size: 18px;
+            }
+
+            header p {
+                font-size: 12px;
+            }
+
+            .controls {
+                padding: 10px;
+                gap: 8px;
+            }
+
+            button {
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+
+            #map {
+                height: calc(100vh - 320px);
+            }
+
+            .pharmacy-list-container {
+                max-height: 200px;
+                padding: 10px;
+            }
+
+            footer {
+                padding: 15px 10px;
+                font-size: 11px;
+            }
+
+            .legend {
+                flex-direction: column;
+                gap: 8px;
+                align-items: flex-start;
             }
         }
     </style>
 </head>
 <body>
-    <!-- Page header with title -->
+    <!-- ============================================
+         HEADER
+         ============================================ -->
     <header>
-        <h1>Nearby Pharmacies Map</h1>
+        <h1>🏥 Nearby Pharmacies Finder</h1>
+        <p>Find pharmacies near you with OpenStreetMap and Leaflet.js</p>
     </header>
 
-    <!-- Container for the Google Map -->
-    <div class="map-container">
-        <div id="map"></div>
+    <!-- ============================================
+         CONTROLS
+         ============================================ -->
+    <div class="controls">
+        <div class="search-container">
+            <input 
+                type="text" 
+                id="pharmacy-search" 
+                placeholder="Search pharmacy by name..."
+                aria-label="Search pharmacy"
+            >
+            <button id="search-pharmacy-btn">🔍 Search</button>
+        </div>
+        <button id="find-nearest-btn">📍 Find Nearest</button>
+        <button id="toggle-dark-mode">🌙 Dark Mode</button>
+        <div id="location-status">Detecting location...</div>
     </div>
 
-    <!-- Footer with information about the markers -->
+    <!-- ============================================
+         MAP CONTAINER
+         ============================================ -->
+    <div id="map"></div>
+
+    <!-- ============================================
+         PHARMACY LIST
+         ============================================ -->
+    <div class="pharmacy-list-container">
+        <h3>📋 Nearby Pharmacies (sorted by distance)</h3>
+        <div id="pharmacy-list"></div>
+    </div>
+
+    <!-- ============================================
+         FOOTER
+         ============================================ -->
     <footer>
-        <p>📍 Markers show pharmacies near you. Blue marker indicates your current location.</p>
+        <p><strong>How to use:</strong> Allow location access to find nearby pharmacies. Click markers for details.</p>
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-marker user-location"></div>
+                <span>Your Location</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-marker pharmacy"></div>
+                <span>Pharmacy</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-marker nearest"></div>
+                <span>Nearest Pharmacy</span>
+            </div>
+        </div>
     </footer>
 
-    <!-- Google Maps API script with async and defer attributes -->
-    <!-- Replace YOUR_API_KEY with your actual Google Maps API key -->
-   <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=initMap" async defer></script>
+    <!-- Leaflet.js Library -->
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    
+    <!-- Leaflet MarkerCluster Library -->
+    <script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
 
-    <!-- Main JavaScript code for map functionality -->
+    <!-- ============================================
+         MAIN APPLICATION SCRIPT
+         ============================================ -->
     <script>
         // ============================================
-        // PHARMACY DATA
+        // 1. PHARMACY DATABASE (10+ Example Pharmacies)
         // ============================================
-        // Array of pharmacy locations with details
-        // Coordinates are centered around Tashkent, Uzbekistan (default location)
         const pharmacies = [
             {
+                id: 1,
                 name: "Central Pharmacy",
-                lat: 41.2995,
-                lng: 69.2401,
-                hours: "Mon-Sun: 8:00 AM - 10:00 PM",
-                description: "Full-service pharmacy with qualified pharmacists"
+                lat: 40.7128,
+                lon: -74.0060,
+                hours: "08:00 - 22:00",
+                description: "Full-service pharmacy with prescription and OTC medications",
+                phone: "(555) 123-4567"
             },
             {
+                id: 2,
+                name: "Wellness Pharmacy",
+                lat: 40.7150,
+                lon: -74.0070,
+                hours: "09:00 - 21:00",
+                description: "Specializing in health supplements and wellness products",
+                phone: "(555) 234-5678"
+            },
+            {
+                id: 3,
+                name: "Express Pharmacy",
+                lat: 40.7108,
+                lon: -74.0040,
+                hours: "24/7",
+                description: "Quick service pharmacy, 24-hour open",
+                phone: "(555) 345-6789"
+            },
+            {
+                id: 4,
+                name: "Care Pharmacy",
+                lat: 40.7180,
+                lon: -74.0100,
+                hours: "08:30 - 20:00",
+                description: "Professional pharmacy with consultation services",
+                phone: "(555) 456-7890"
+            },
+            {
+                id: 5,
                 name: "Health Plus Pharmacy",
-                lat: 41.3050,
-                lng: 69.2450,
-                hours: "Mon-Sun: 7:00 AM - 11:00 PM",
-                description: "24-hour emergency service available"
+                lat: 40.7090,
+                lon: -74.0020,
+                hours: "07:00 - 23:00",
+                description: "Comprehensive pharmacy with vaccination services",
+                phone: "(555) 567-8901"
             },
             {
-                name: "MediCare Pharmacy",
-                lat: 41.2950,
-                lng: 69.2350,
-                hours: "Mon-Sat: 9:00 AM - 9:00 PM, Sun: 10:00 AM - 6:00 PM",
-                description: "Specializes in prescription medications"
+                id: 6,
+                name: "Modern Pharmacy",
+                lat: 40.7200,
+                lon: -74.0130,
+                hours: "09:00 - 19:00",
+                description: "Modern equipped pharmacy with delivery service",
+                phone: "(555) 678-9012"
             },
             {
-                name: "wellness Pharmacy",
-                lat: 41.3100,
-                lng: 69.2500,
-                hours: "Mon-Sun: 8:30 AM - 8:30 PM",
-                description: "Natural remedies and supplements available"
-            },
-            {
-                name: "FastCare Pharmacy",
-                lat: 41.2900,
-                lng: 69.2480,
-                hours: "Mon-Sun: 8:00 AM - 10:00 PM",
-                description: "Quick service with online ordering"
-            },
-            {
+                id: 7,
                 name: "City Center Pharmacy",
-                lat: 41.3030,
-                lng: 69.2380,
-                hours: "Mon-Sun: 9:00 AM - 9:00 PM",
-                description: "Located in shopping mall for convenience"
+                lat: 40.7140,
+                lon: -74.0055,
+                hours: "08:00 - 22:00",
+                description: "Centrally located with wide product selection",
+                phone: "(555) 789-0123"
+            },
+            {
+                id: 8,
+                name: "Quick Care Pharmacy",
+                lat: 40.7100,
+                lon: -74.0085,
+                hours: "10:00 - 20:00",
+                description: "Fast service pharmacy with home delivery",
+                phone: "(555) 890-1234"
+            },
+            {
+                id: 9,
+                name: "Community Pharmacy",
+                lat: 40.7170,
+                lon: -74.0040,
+                hours: "08:00 - 21:00",
+                description: "Community pharmacy with local focus",
+                phone: "(555) 901-2345"
+            },
+            {
+                id: 10,
+                name: "Trusted Pharmacy",
+                lat: 40.7120,
+                lon: -74.0110,
+                hours: "09:00 - 20:00",
+                description: "Trusted pharmacy serving the community for 20 years",
+                phone: "(555) 012-3456"
+            },
+            {
+                id: 11,
+                name: "Prime Pharmacy",
+                lat: 40.7160,
+                lon: -74.0075,
+                hours: "08:00 - 23:00",
+                description: "Premium pharmacy with expert staff",
+                phone: "(555) 111-2222"
+            },
+            {
+                id: 12,
+                name: "Neighborhood Pharmacy",
+                lat: 40.7110,
+                lon: -74.0035,
+                hours: "09:00 - 19:00",
+                description: "Your neighborhood pharmacy with personal service",
+                phone: "(555) 222-3333"
             }
         ];
 
         // ============================================
-        // MAP INITIALIZATION
+        // 2. GLOBAL VARIABLES
         // ============================================
-        // Global variables for map and markers
-        let map;
-        let userMarker;
+        let map = null;
+        let userMarker = null;
         let pharmacyMarkers = [];
-        let infoWindows = [];
+        let pharmacyClusterGroup = null;
+        let userLocation = null;
+        let isDarkMode = false;
 
-        // Default location (Tashkent, Uzbekistan) in case geolocation fails
-        const defaultLocation = {
-            lat: 41.2995,
-            lng: 69.2401,
-            name: "Tashkent, Uzbekistan"
-        };
+        // ============================================
+        // 3. INITIALIZE MAP
+        // ============================================
+        function initializeMap() {
+            // Create map centered on default location
+            map = L.map('map').setView([40.7128, -74.0060], 13);
 
-        /**
-         * Initialize the Google Map
-         * This function is called when the Google Maps API finishes loading
-         */
-        function initMap() {
-            // Create the map object centered on default location
-            map = new google.maps.Map(document.getElementById("map"), {
-                zoom: 14,
-                center: { lat: defaultLocation.lat, lng: defaultLocation.lng },
-                mapTypeId: google.maps.MapTypeId.ROADMAP,
-                fullscreenControl: true,
-                mapTypeControl: true,
-                streetViewControl: true,
-                zoomControl: true,
-                panControl: true
+            // Add OpenStreetMap tiles
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                maxZoom: 19,
+                minZoom: 2
+            }).addTo(map);
+
+            // Initialize marker cluster group
+            pharmacyClusterGroup = L.markerClusterGroup({
+                maxClusterRadius: 80,
+                iconCreateFunction: function(cluster) {
+                    const count = cluster.getChildCount();
+                    const size = count > 100 ? 'large' : count > 50 ? 'medium' : 'small';
+                    return L.divIcon({
+                        html: `<div style="background-color: #27ae60; color: white; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px;">${count}</div>`,
+                        iconSize: [40, 40],
+                        className: 'marker-cluster'
+                    });
+                }
             });
 
-            // Attempt to get user's current location using browser geolocation API
-            detectUserLocation();
-
-            // Add pharmacy markers to the map
-            addPharmacyMarkers();
+            map.addLayer(pharmacyClusterGroup);
         }
 
         // ============================================
-        // GEOLOCATION DETECTION
+        // 4. HAVERSINE FORMULA - Calculate Distance
         // ============================================
-        /**
-         * Detect user's current location using the Geolocation API
-         * If successful, centers map on user location and adds a marker
-         * If failed, keeps map centered on default location
-         */
-        function detectUserLocation() {
-            // Check if browser supports geolocation API
-            if (navigator.geolocation) {
-                // Request user's current position
-                navigator.geolocation.getCurrentPosition(
-                    // Success callback - handles successful location detection
-                    function (position) {
-                        const userLocation = {
-                            lat: position.coords.latitude,
-                            lng: position.coords.longitude
-                        };
-
-                        // Center map on user's location
-                        map.setCenter(userLocation);
-                        
-                        // Adjust zoom level for better city street view
-                        map.setZoom(15);
-
-                        // Add a marker for user's current location
-                        addUserLocationMarker(userLocation);
-
-                        // Log success message to console
-                        console.log("User location detected:", userLocation);
-                    },
-                    // Error callback - handles geolocation failures
-                    function (error) {
-                        // Display error message based on error type
-                        let errorMessage = "Geolocation failed. Showing default location.";
-                        
-                        switch(error.code) {
-                            case error.PERMISSION_DENIED:
-                                errorMessage = "Permission denied. Using default location.";
-                                break;
-                            case error.POSITION_UNAVAILABLE:
-                                errorMessage = "Position unavailable. Using default location.";
-                                break;
-                            case error.TIMEOUT:
-                                errorMessage = "Geolocation timeout. Using default location.";
-                                break;
-                        }
-
-                        // Log error to console for debugging
-                        console.log(errorMessage);
-                        
-                        // Show alert to user (optional - comment out if not desired)
-                        // alert(errorMessage);
-
-                        // Map stays centered on default location
-                        map.setCenter({ lat: defaultLocation.lat, lng: defaultLocation.lng });
-                    },
-                    // Geolocation options
-                    {
-                        enableHighAccuracy: true,  // Request high accuracy if available
-                        timeout: 10000,             // 10 second timeout
-                        maximumAge: 0               // Don't use cached positions
-                    }
-                );
-            } else {
-                // Browser doesn't support geolocation API
-                console.log("Geolocation is not supported by this browser.");
-                alert("Your browser does not support geolocation.");
-            }
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Earth's radius in kilometers
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = 
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            const distance = R * c;
+            return distance.toFixed(2);
         }
 
         // ============================================
-        // USER LOCATION MARKER
+        // 5. CREATE CUSTOM MARKER ICON
         // ============================================
-        /**
-         * Add a marker at the user's current location
-         * Uses a custom blue marker to distinguish from pharmacy markers
-         * @param {Object} location - Object with lat and lng properties
-         */
-        function addUserLocationMarker(location) {
-            // Remove previous user marker if it exists
+        function createMarkerIcon(color) {
+            return L.divIcon({
+                html: `<div style="background-color: ${color}; width: 30px; height: 30px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;">
+                    <div style="width: 8px; height: 8px; background-color: white; border-radius: 50%;"></div>
+                </div>`,
+                iconSize: [30, 30],
+                popupAnchor: [0, -15]
+            });
+        }
+
+        // ============================================
+        // 6. ADD USER MARKER
+        // ============================================
+        function addUserMarker(lat, lon) {
             if (userMarker) {
-                userMarker.setMap(null);
+                map.removeLayer(userMarker);
             }
 
-            // Create custom SVG icon for user location (blue circle)
-            const userIcon = {
-                path: google.maps.SymbolPath.CIRCLE,
-                scale: 10,
-                fillColor: "#4285F4",
-                fillOpacity: 1,
-                strokeColor: "#ffffff",
-                strokeWeight: 2
-            };
+            userMarker = L.marker([lat, lon], {
+                icon: createMarkerIcon('#3b82f6'),
+                zIndexOffset: 1000
+            }).addTo(map);
 
-            // Create marker for user's location
-            userMarker = new google.maps.Marker({
-                position: location,
-                map: map,
-                title: "Your Location",
-                icon: userIcon,
-                zIndex: 100  // Place user marker on top
-            });
+            userMarker.bindPopup(`
+                <div class="popup-title">📍 Your Location</div>
+                <div class="popup-info">
+                    <strong>Latitude:</strong> ${lat.toFixed(4)}<br>
+                    <strong>Longitude:</strong> ${lon.toFixed(4)}
+                </div>
+            `);
 
-            // Create info window (popup) for user location
-            const userInfoWindow = new google.maps.InfoWindow({
-                content: "<div style='font-size: 14px; color: #333;'><b>📍 You are here</b></div>",
-                maxWidth: 200
-            });
-
-            // Open info window when user marker is clicked
-            userMarker.addListener("click", function () {
-                // Close all other info windows first
-                closeAllInfoWindows();
-                userInfoWindow.open(map, userMarker);
-            });
-
-            // Automatically open the info window for user location
-            userInfoWindow.open(map, userMarker);
+            userMarker.openPopup();
         }
 
         // ============================================
-        // PHARMACY MARKERS
+        // 7. ADD PHARMACY MARKERS
         // ============================================
-        /**
-         * Add markers for all pharmacies to the map
-         * Each marker is clickable and displays pharmacy details in an info window
-         */
         function addPharmacyMarkers() {
-            // Loop through each pharmacy in the array
-            pharmacies.forEach((pharmacy, index) => {
-                // Create custom SVG icon for pharmacies (green cross - pharmacy symbol)
-                const pharmacyIcon = {
-                    path: "M 0,-10 Q -10,-10 -10,0 Q -10,10 0,10 Q 10,10 10,0 Q 10,-10 0,-10 M -3,-5 L 3,-5 L 3,-3 L 5,-3 L 5,3 L 3,3 L 3,5 L -3,5 L -3,3 L -5,3 L -5,-3 L -3,-3 L -3,-5",
-                    scale: 1.2,
-                    fillColor: "#34a853",
-                    fillOpacity: 1,
-                    strokeColor: "#ffffff",
-                    strokeWeight: 2
-                };
+            // Clear existing markers
+            pharmacyClusterGroup.clearLayers();
+            pharmacyMarkers = [];
 
-                // Create marker for the pharmacy
-                const marker = new google.maps.Marker({
-                    position: { lat: pharmacy.lat, lng: pharmacy.lng },
-                    map: map,
-                    title: pharmacy.name,
-                    icon: pharmacyIcon,
-                    animation: google.maps.Animation.DROP  // Animation when marker appears
+            // Calculate distances and add markers
+            const pharmaciesWithDistance = pharmacies.map(pharmacy => {
+                const distance = calculateDistance(
+                    userLocation.lat,
+                    userLocation.lon,
+                    pharmacy.lat,
+                    pharmacy.lon
+                );
+                return { ...pharmacy, distance };
+            });
+
+            // Find nearest pharmacy
+            const nearestPharmacy = pharmaciesWithDistance.reduce((prev, current) => 
+                (parseFloat(prev.distance) < parseFloat(current.distance)) ? prev : current
+            );
+
+            // Add markers
+            pharmaciesWithDistance.forEach(pharmacy => {
+                const isNearest = pharmacy.id === nearestPharmacy.id;
+                const markerColor = isNearest ? '#ef4444' : '#22c55e';
+
+                const marker = L.marker([pharmacy.lat, pharmacy.lon], {
+                    icon: createMarkerIcon(markerColor),
+                    zIndexOffset: isNearest ? 999 : 0
                 });
 
-                // Create HTML content for the info window (popup)
-                const infoContent = `
-                    <div style="font-family: Arial, sans-serif; width: 250px; padding: 10px;">
-                        <h3 style="margin: 0 0 10px 0; color: #2c3e50; font-size: 16px;">💊 ${pharmacy.name}</h3>
-                        <p style="margin: 5px 0; color: #555; font-size: 13px;">
-                            <b>Hours:</b> ${pharmacy.hours}
-                        </p>
-                        <p style="margin: 5px 0; color: #555; font-size: 13px;">
-                            <b>Info:</b> ${pharmacy.description}
-                        </p>
-                        <p style="margin: 10px 0 0 0; color: #999; font-size: 12px;">
-                            📍 Lat: ${pharmacy.lat.toFixed(4)}, Lng: ${pharmacy.lng.toFixed(4)}
-                        </p>
+                // Create popup content
+                const popupContent = `
+                    <div class="popup-title">💊 ${pharmacy.name}</div>
+                    <div class="popup-info">
+                        <strong>⏰ Hours:</strong> ${pharmacy.hours}<br>
+                        <strong>📝 Description:</strong> ${pharmacy.description}<br>
+                        <strong>📞 Phone:</strong> ${pharmacy.phone}<br>
+                        <strong>📏 Distance:</strong> ${pharmacy.distance} km<br>
+                        <strong>📍 Coordinates:</strong> ${pharmacy.lat.toFixed(4)}, ${pharmacy.lon.toFixed(4)}
+                        ${isNearest ? '<br><span style="color: #ef4444; font-weight: bold;">⭐ NEAREST PHARMACY</span>' : ''}
+                    </div>
+                    <button class="popup-button" onclick="openGoogleMaps(${pharmacy.lat}, ${pharmacy.lon}, '${pharmacy.name}')">
+                        🗺️ Directions
+                    </button>
+                `;
+
+                marker.bindPopup(popupContent);
+                pharmacyClusterGroup.addLayer(marker);
+                pharmacyMarkers.push({ marker, pharmacy: { ...pharmacy, distance: parseFloat(pharmacy.distance) } });
+            });
+        }
+
+        // ============================================
+        // 8. UPDATE PHARMACY LIST
+        // ============================================
+        function updatePharmacyList() {
+            const listContainer = document.getElementById('pharmacy-list');
+            listContainer.innerHTML = '';
+
+            // Sort pharmacies by distance
+            const sortedPharmacies = pharmacyMarkers
+                .map(item => item.pharmacy)
+                .sort((a, b) => a.distance - b.distance);
+
+            sortedPharmacies.forEach((pharmacy, index) => {
+                const isNearest = index === 0;
+                const listItem = document.createElement('div');
+                listItem.className = `pharmacy-item ${isNearest ? 'nearest' : ''}`;
+                listItem.innerHTML = `
+                    <strong>${index + 1}. ${pharmacy.name}${isNearest ? ' ⭐' : ''}</strong>
+                    <div class="pharmacy-item-distance">
+                        📏 ${pharmacy.distance} km away | ⏰ ${pharmacy.hours}
                     </div>
                 `;
 
-                // Create info window for the pharmacy marker
-                const infoWindow = new google.maps.InfoWindow({
-                    content: infoContent,
-                    maxWidth: 300
+                // Add click event to zoom to pharmacy
+                listItem.addEventListener('click', () => {
+                    map.setView([pharmacy.lat, pharmacy.lon], 16);
+                    pharmacyMarkers.find(m => m.pharmacy.id === pharmacy.id)?.marker.openPopup();
                 });
 
-                // Store info window for later reference
-                infoWindows.push(infoWindow);
-
-                // Add click listener to marker to open its info window
-                marker.addListener("click", function () {
-                    // Close all other info windows first
-                    closeAllInfoWindows();
-                    // Open this marker's info window
-                    infoWindow.open(map, marker);
-                });
-
-                // Store marker reference for potential future manipulation
-                pharmacyMarkers.push(marker);
+                listContainer.appendChild(listItem);
             });
         }
 
         // ============================================
-        // UTILITY FUNCTIONS
+        // 9. GEOLOCATION SUCCESS HANDLER
         // ============================================
-        /**
-         * Close all open info windows on the map
-         * Used to ensure only one popup is open at a time
-         */
-        function closeAllInfoWindows() {
-            // Loop through all stored info windows and close them
-            infoWindows.forEach(function (infoWindow) {
-                infoWindow.close();
-            });
+        function onLocationSuccess(position) {
+            userLocation = {
+                lat: position.coords.latitude,
+                lon: position.coords.longitude,
+                accuracy: position.coords.accuracy
+            };
+
+            // Update status
+            document.getElementById('location-status').innerHTML = 
+                `✅ Location found (Accuracy: ${userLocation.accuracy.toFixed(0)}m)`;
+
+            // Center map on user
+            map.setView([userLocation.lat, userLocation.lon], 15);
+
+            // Add user marker
+            addUserMarker(userLocation.lat, userLocation.lon);
+
+            // Add pharmacy markers
+            addPharmacyMarkers();
+
+            // Update pharmacy list
+            updatePharmacyList();
         }
 
         // ============================================
-        // RESPONSIVE MAP RESIZE
+        // 10. GEOLOCATION ERROR HANDLER
         // ============================================
-        /**
-         * Handle map resizing when window is resized
-         * Ensures map remains responsive on different screen sizes
-         */
-        window.addEventListener("resize", function () {
-            // Trigger map resize event to recalculate dimensions
-            if (map) {
-                google.maps.event.trigger(map, "resize");
+        function onLocationError(error) {
+            let errorMessage = 'Location unavailable';
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    errorMessage = 'Permission denied. Using default location.';
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    errorMessage = 'Position unavailable. Using default location.';
+                    break;
+                case error.TIMEOUT:
+                    errorMessage = 'Timeout. Using default location.';
+                    break;
             }
-        });
 
+            console.warn(errorMessage, error);
+            document.getElementById('location-status').innerHTML = 
+                `⚠️ ${errorMessage}`;
+
+            // Use default location (New York)
+            userLocation = {
+                lat: 40.7128,
+                lon: -74.0060,
+                accuracy: null
+            };
+
+            // Add pharmacy markers and list
+            addPharmacyMarkers();
+            updatePharmacyList();
+        }
+
+        // ============================================
+        // 11. REQUEST USER LOCATION
+        // ============================================
+        function requestUserLocation() {
+            document.getElementById('location-status').innerHTML = 
+                `<span class="loading-spinner"></span>Detecting location...`;
+
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    onLocationSuccess,
+                    onLocationError,
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 0
+                    }
+                );
+            } else {
+                onLocationError({ code: 4 });
+            }
+        }
+
+        // ============================================
+        // 12. FIND NEAREST PHARMACY
+        // ============================================
+        function findNearestPharmacy() {
+            if (!userLocation) return;
+
+            const nearestPharmacy = pharmacyMarkers
+                .map(item => item.pharmacy)
+                .reduce((prev, current) => 
+                    (prev.distance < current.distance) ? prev : current
+                );
+
+            map.setView([nearestPharmacy.lat, nearestPharmacy.lon], 16);
+            pharmacyMarkers
+                .find(m => m.pharmacy.id === nearestPharmacy.id)
+                ?.marker.openPopup();
+        }
+
+        // ============================================
+        // 13. SEARCH PHARMACY
+        // ============================================
+        function searchPharmacy() {
+            const searchTerm = document.getElementById('pharmacy-search').value.toLowerCase();
+            
+            if (!searchTerm) {
+                alert('Please enter a pharmacy name');
+                return;
+            }
+
+            const foundPharmacy = pharmacyMarkers
+                .map(item => item.pharmacy)
+                .find(p => p.name.toLowerCase().includes(searchTerm));
+
+            if (foundPharmacy) {
+                map.setView([foundPharmacy.lat, foundPharmacy.lon], 16);
+                pharmacyMarkers
+                    .find(m => m.pharmacy.id === foundPharmacy.id)
+                    ?.marker.openPopup();
+                document.getElementById('pharmacy-search').value = '';
+            } else {
+                alert(`No pharmacy found matching "${searchTerm}"`);
+            }
+        }
+
+        // ============================================
+        // 14. OPEN GOOGLE MAPS DIRECTIONS
+        // ============================================
+        function openGoogleMaps(lat, lon, name) {
+            const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}&travelmode=driving`;
+            window.open(url, '_blank');
+        }
+
+        // ============================================
+        // 15. TOGGLE DARK MODE
+        // ============================================
+        function toggleDarkMode() {
+            isDarkMode = !isDarkMode;
+            document.body.classList.toggle('dark-mode');
+            
+            // Update map tiles for dark mode
+            if (isDarkMode) {
+                // Change to dark tiles
+                map.eachLayer(layer => {
+                    if (layer instanceof L.TileLayer) {
+                        map.removeLayer(layer);
+                    }
+                });
+                
+                L.tileLayer('https://tiles.stadiamaps.com/tiles/stamen_toner/{z}/{x}/{y}.png', {
+                    attribution: '&copy; <a href="https://www.stadiamaps.com/">Stadia Maps</a>',
+                    maxZoom: 19,
+                    minZoom: 2
+                }).addTo(map);
+            } else {
+                // Change back to normal tiles
+                map.eachLayer(layer => {
+                    if (layer instanceof L.TileLayer) {
+                        map.removeLayer(layer);
+                    }
+                });
+                
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                    maxZoom: 19,
+                    minZoom: 2
+                }).addTo(map);
+            }
+        }
+
+        // ============================================
+        // 16. EVENT LISTENERS
+        // ============================================
+        document.getElementById('find-nearest-btn').addEventListener('click', findNearestPharmacy);
+        document.getElementById('search-pharmacy-btn').addEventListener('click', searchPharmacy);
+        document.getElementById('pharmacy-search').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') searchPharmacy();
+        });
+        document.getElementById('toggle-dark-mode').addEventListener('click', toggleDarkMode);
+
+        // ============================================
+        // 17. INITIALIZE APP
+        // ============================================
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeMap();
+            requestUserLocation();
+        });
     </script>
 </body>
 </html>
