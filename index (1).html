@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Pharmacy Map</title>
+
+  <!-- Leaflet CSS via CDN (external dependency) -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-sA+e2k0G8w7r7m+Xw2b0u8p4Qb4pZb1s0f5p0bXvCk0="
+    crossorigin=""
+  />
+
+  <style>
+    /* Styling choices:
+       - Use a simple, modern font (Arial).
+       - Keep design clean and minimal.
+       - Header centered with vertical margin.
+       - Map fills most of the viewport (90% height) and full width.
+       - Popups readable by increasing font size and using the same font.
+    */
+    html, body {
+      height: 100%;
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #f7f7f7;
+      color: #222;
+    }
+
+    header {
+      text-align: center; /* Header centered */
+      margin: 18px 0;     /* Margin at top and bottom */
+    }
+
+    h1 {
+      font-weight: 600;
+      margin: 0;
+      font-size: 1.6rem;
+    }
+
+    /* Map container fills 90% of the viewport height and full width */
+    #map {
+      width: 100%;
+      height: 90vh; /* 90% of viewport height */
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    /* Make leaflet popups more readable */
+    .leaflet-popup-content {
+      font-size: 16px; /* readable font size for popups */
+      line-height: 1.4;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    /* Small legend / info text at the bottom (overlaying the map) */
+    .map-legend {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: 14px;
+      background: rgba(255,255,255,0.95);
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.12);
+      pointer-events: none; /* prevents blocking map interactions */
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 480px) {
+      h1 { font-size: 1.2rem; }
+      .leaflet-popup-content { font-size: 15px; }
+      .map-legend { font-size: 12px; padding: 5px 8px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Pharmacy Map</h1>
+  </header>
+
+  <!-- Map element: Leaflet will initialize here -->
+  <div id="map" role="region" aria-label="Map showing pharmacy locations in the city"></div>
+
+  <!-- Legend / info text explaining markers -->
+  <div class="map-legend" aria-hidden="true">Markers represent pharmacy locations</div>
+
+  <!-- Leaflet JS via CDN (external dependency) -->
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-o9N1j6kQm0Y3qzQv5X2gWk9gQ2a1b3zY1Pp6v5Q5rQg="
+    crossorigin=""
+  ></script>
+
+  <script>
+    /* Map Initialization:
+       - Create a Leaflet map and set its view to the target city's center coordinates.
+       - Choose an appropriate zoom level for a city-wide view.
+    */
+    // Center coordinates for Tashkent, Uzbekistan
+    const cityCenter = [41.2995, 69.2401]; // latitude, longitude
+    const cityZoom = 12; // city-level zoom
+
+    // Initialize the map in the 'map' div
+    const map = L.map('map').setView(cityCenter, cityZoom);
+
+    /* Tile layer setup:
+       - Use OpenStreetMap tiles (free and widely used).
+       - Include proper attribution as required by OpenStreetMap.
+       - This configures the visual basemap for the Leaflet map.
+    */
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors',
+      maxZoom: 19,
+      tileSize: 256,
+      // No API key required for standard OpenStreetMap tiles
+    }).addTo(map);
+
+    /* Pharmacy markers creation:
+       - Define an array of pharmacies with coordinates, name, opening hours, and optional description.
+       - Only these pharmacy locations will be shown on the map as markers.
+    */
+    const pharmacies = [
+      {
+        name: "Central Pharmacy No.1",
+        coords: [41.2995, 69.2401],
+        hours: "08:00 - 22:00",
+        description: "Located near the city center. Walk-ins welcome."
+      },
+      {
+        name: "Amir Timur Pharmacy",
+        coords: [41.3120, 69.2790],
+        hours: "09:00 - 21:00",
+        description: "Close to Amir Timur Square."
+      },
+      {
+        name: "Bek Pharmacy",
+        coords: [41.3035, 69.2310],
+        hours: "07:30 - 20:00",
+        description: "Neighborhood pharmacy with quick service."
+      },
+      {
+        name: "University Pharmacy",
+        coords: [41.3210, 69.2600],
+        hours: "08:00 - 19:00",
+        description: "Serves university students and staff."
+      }
+    ];
+
+    /* Popup binding and marker creation:
+       - For each pharmacy, create a Leaflet marker at the given coordinates.
+       - Format popup HTML to show the pharmacy name in bold, opening hours, and optional description.
+       - Bind the popup to the marker so it opens when the marker is clicked.
+    */
+    pharmacies.forEach(pharmacy => {
+      // Create marker for the pharmacy
+      const marker = L.marker(pharmacy.coords).addTo(map);
+
+      // Construct popup content: name in bold, opening hours, and optional description
+      const popupContent = `
+        <div>
+          <strong>${escapeHtml(pharmacy.name)}</strong><br/>
+          <em>Opening hours:</em> ${escapeHtml(pharmacy.hours)}<br/>
+          ${pharmacy.description ? `<div>${escapeHtml(pharmacy.description)}</div>` : ''}
+        </div>
+      `;
+
+      // Bind the popup to the marker (popup binding)
+      marker.bindPopup(popupContent, {
+        keepInView: true,
+        maxWidth: 260
+      });
+    });
+
+    /* Utility: simple HTML-escape to avoid any accidental HTML injection in popup strings.
+       This is a lightweight safety step since content is static in this example.
+    */
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    /* Optional UX improvement:
+       - If the user opens the map on a very small device, keep the map centered on the city center
+         after orientation changes or resizes.
+    */
+    window.addEventListener('resize', function () {
+      map.setView(cityCenter, map.getZoom());
+    });
+  </script>
+</body>
+</html>
