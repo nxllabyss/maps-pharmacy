@@ -1,369 +1,411 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <!-- Character encoding for proper text rendering -->
     <meta charset="UTF-8">
-    <!-- Viewport settings for responsive design and proper mobile display -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Page title shown in browser tab -->
     <title>Nearby Pharmacies Map</title>
-    
-    <!-- Inline CSS Styles -->
     <style>
-        /* Reset default browser margins and padding */
+        /* Reset default browser styles */
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
 
-        /* Body styles - clean background and font setup */
+        /* Body styling - set background and font */
         body {
             font-family: Arial, sans-serif;
             background-color: #f5f5f5;
-            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
 
-        /* Header styling - centered and visually distinct */
+        /* Header styling - centered with modern appearance */
         header {
             background-color: #2c3e50;
             color: white;
             padding: 20px;
             text-align: center;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
             z-index: 10;
-            position: relative;
         }
 
-        /* Header text styling */
-        header h1 {
+        /* Header title styling */
+        h1 {
             font-size: 28px;
             font-weight: bold;
             letter-spacing: 0.5px;
         }
 
-        /* Map container - takes up most of the viewport */
-        #map {
-            width: 100%;
-            height: calc(100vh - 80px); /* Full viewport height minus header */
-            border: 1px solid #ddd;
+        /* Container for the map - takes up most of the viewport */
+        .map-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            margin: 10px;
+            border-radius: 8px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         }
 
-        /* Footer styling - informational message */
-        footer {
-            background-color: #ecf0f1;
-            color: #2c3e50;
-            padding: 10px 20px;
-            text-align: center;
-            font-size: 12px;
-            position: absolute;
-            bottom: 0;
+        /* Map element styling - fills the container */
+        #map {
             width: 100%;
-            box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+            height: 100%;
+            border-radius: 8px;
         }
 
-        /* Custom styling for map popups (InfoWindow) */
-        .info-window-content {
-            font-family: Arial, sans-serif;
+        /* Footer styling - information about markers */
+        footer {
+            background-color: #34495e;
+            color: white;
+            padding: 15px;
+            text-align: center;
             font-size: 14px;
-            line-height: 1.6;
-            padding: 5px;
+            box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
         }
 
-        /* Bold styling for pharmacy names in popups */
-        .info-window-content strong {
-            color: #2c3e50;
-            font-size: 16px;
-            display: block;
-            margin-bottom: 5px;
-        }
-
-        /* Pharmacy details text in popups */
-        .info-window-content p {
-            margin: 3px 0;
-            color: #34495e;
-            font-size: 13px;
+        /* Responsive design for smaller screens */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 22px;
+            }
+            
+            .map-container {
+                margin: 5px;
+            }
         }
     </style>
 </head>
 <body>
-    <!-- Header section with page title -->
+    <!-- Page header with title -->
     <header>
-        <h1>🏥 Nearby Pharmacies Map</h1>
+        <h1>Nearby Pharmacies Map</h1>
     </header>
 
-    <!-- Main map container where Google Maps will be rendered -->
-    <div id="map"></div>
+    <!-- Container for the Google Map -->
+    <div class="map-container">
+        <div id="map"></div>
+    </div>
 
-    <!-- Footer with informational message -->
+    <!-- Footer with information about the markers -->
     <footer>
-        📍 Markers show pharmacies near you. Your location is marked with a blue marker.
+        <p>📍 Markers show pharmacies near you. Blue marker indicates your current location.</p>
     </footer>
 
-    <!-- Google Maps API Script with callback function -->
+    <!-- Google Maps API script with async and defer attributes -->
     <!-- Replace YOUR_API_KEY with your actual Google Maps API key -->
-    <!-- async and defer attributes allow page to load while script loads -->
-    <script async defer src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=initMap"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=initMap" async defer></script>
 
-    <!-- Main JavaScript Logic -->
+    <!-- Main JavaScript code for map functionality -->
     <script>
-        // ========== GLOBAL VARIABLES ==========
-        // Variable to store the Google Map object
-        let map;
-        // Variable to store user's current location marker
-        let userLocationMarker;
-        // Variable to store the current InfoWindow (popup)
-        let currentInfoWindow;
-        // Default location (Tashkent, Uzbekistan) used if geolocation fails
-        const DEFAULT_LOCATION = { lat: 41.2995, lng: 69.2401 };
-        // Default map zoom level
-        const DEFAULT_ZOOM = 14;
-
-        // ========== PHARMACY DATA ==========
-        // Array containing example pharmacy locations with details
-        // Each pharmacy has: name, latitude, longitude, opening hours, and description
+        // ============================================
+        // PHARMACY DATA
+        // ============================================
+        // Array of pharmacy locations with details
+        // Coordinates are centered around Tashkent, Uzbekistan (default location)
         const pharmacies = [
             {
                 name: "Central Pharmacy",
                 lat: 41.2995,
                 lng: 69.2401,
-                hours: "24/7",
-                description: "Modern pharmacy with experienced staff"
-            },
-            {
-                name: "Green Cross Pharmacy",
-                lat: 41.3020,
-                lng: 69.2450,
-                hours: "08:00 - 22:00",
-                description: "Specialized in natural remedies"
+                hours: "Mon-Sun: 8:00 AM - 10:00 PM",
+                description: "Full-service pharmacy with qualified pharmacists"
             },
             {
                 name: "Health Plus Pharmacy",
-                lat: 41.2970,
-                lng: 69.2380,
-                hours: "09:00 - 21:00",
-                description: "Complete range of medications"
-            },
-            {
-                name: "QuickMed Pharmacy",
                 lat: 41.3050,
-                lng: 69.2420,
-                hours: "07:00 - 23:00",
-                description: "Fast delivery and consultation services"
+                lng: 69.2450,
+                hours: "Mon-Sun: 7:00 AM - 11:00 PM",
+                description: "24-hour emergency service available"
             },
             {
-                name: "Family Care Pharmacy",
+                name: "MediCare Pharmacy",
                 lat: 41.2950,
                 lng: 69.2350,
-                hours: "08:30 - 20:30",
-                description: "Family-friendly with children's section"
+                hours: "Mon-Sat: 9:00 AM - 9:00 PM, Sun: 10:00 AM - 6:00 PM",
+                description: "Specializes in prescription medications"
             },
             {
-                name: "Express Pharmacy",
-                lat: 41.3080,
+                name: "wellness Pharmacy",
+                lat: 41.3100,
+                lng: 69.2500,
+                hours: "Mon-Sun: 8:30 AM - 8:30 PM",
+                description: "Natural remedies and supplements available"
+            },
+            {
+                name: "FastCare Pharmacy",
+                lat: 41.2900,
+                lng: 69.2480,
+                hours: "Mon-Sun: 8:00 AM - 10:00 PM",
+                description: "Quick service with online ordering"
+            },
+            {
+                name: "City Center Pharmacy",
+                lat: 41.3030,
                 lng: 69.2380,
-                hours: "10:00 - 22:00",
-                description: "Quick refills and prescription services"
+                hours: "Mon-Sun: 9:00 AM - 9:00 PM",
+                description: "Located in shopping mall for convenience"
             }
         ];
 
-        // ========== MAIN INITIALIZATION FUNCTION ==========
+        // ============================================
+        // MAP INITIALIZATION
+        // ============================================
+        // Global variables for map and markers
+        let map;
+        let userMarker;
+        let pharmacyMarkers = [];
+        let infoWindows = [];
+
+        // Default location (Tashkent, Uzbekistan) in case geolocation fails
+        const defaultLocation = {
+            lat: 41.2995,
+            lng: 69.2401,
+            name: "Tashkent, Uzbekistan"
+        };
+
         /**
-         * initMap() - Called automatically when Google Maps API loads
-         * This function initializes the map and starts the geolocation process
+         * Initialize the Google Map
+         * This function is called when the Google Maps API finishes loading
          */
         function initMap() {
-            // Initialize the map centered at default location
-            map = new google.maps.Map(
-                document.getElementById('map'),
-                {
-                    zoom: DEFAULT_ZOOM,
-                    center: DEFAULT_LOCATION,
-                    mapTypeControl: true,
-                    fullscreenControl: true,
-                    streetViewControl: false,
-                    zoomControl: true,
-                    mapTypeId: 'roadmap'
-                }
-            );
+            // Create the map object centered on default location
+            map = new google.maps.Map(document.getElementById("map"), {
+                zoom: 14,
+                center: { lat: defaultLocation.lat, lng: defaultLocation.lng },
+                mapTypeId: google.maps.MapTypeId.ROADMAP,
+                fullscreenControl: true,
+                mapTypeControl: true,
+                streetViewControl: true,
+                zoomControl: true,
+                panControl: true
+            });
 
-            // Attempt to get user's geolocation
-            // This will request permission from the browser
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                    // Success callback: user location found
-                    (position) => {
-                        handleGeolocationSuccess(position);
-                    },
-                    // Error callback: geolocation failed or denied
-                    (error) => {
-                        handleGeolocationError(error);
-                    }
-                );
-            } else {
-                // Browser doesn't support geolocation
-                console.warn("Geolocation is not supported by this browser.");
-                handleGeolocationError(null);
-            }
+            // Attempt to get user's current location using browser geolocation API
+            detectUserLocation();
 
             // Add pharmacy markers to the map
-            // This happens regardless of whether geolocation succeeds
             addPharmacyMarkers();
         }
 
-        // ========== GEOLOCATION SUCCESS HANDLER ==========
+        // ============================================
+        // GEOLOCATION DETECTION
+        // ============================================
         /**
-         * handleGeolocationSuccess(position)
-         * Called when user's location is successfully detected
-         * @param {Position} position - Object containing user's coordinates
+         * Detect user's current location using the Geolocation API
+         * If successful, centers map on user location and adds a marker
+         * If failed, keeps map centered on default location
          */
-        function handleGeolocationSuccess(position) {
-            // Extract latitude and longitude from position object
-            const latitude = position.coords.latitude;
-            const longitude = position.coords.longitude;
-            const userLocation = { lat: latitude, lng: longitude };
+        function detectUserLocation() {
+            // Check if browser supports geolocation API
+            if (navigator.geolocation) {
+                // Request user's current position
+                navigator.geolocation.getCurrentPosition(
+                    // Success callback - handles successful location detection
+                    function (position) {
+                        const userLocation = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude
+                        };
 
-            // Center the map on user's actual location
-            map.setCenter(userLocation);
-            // Adjust zoom to see street level details
-            map.setZoom(15);
+                        // Center map on user's location
+                        map.setCenter(userLocation);
+                        
+                        // Adjust zoom level for better city street view
+                        map.setZoom(15);
 
-            // Create a marker for the user's current location
-            userLocationMarker = new google.maps.Marker({
-                position: userLocation,
-                map: map,
-                title: "You are here",
-                // Use a blue circle icon to distinguish user location
-                icon: {
-                    path: google.maps.SymbolPath.CIRCLE,
-                    scale: 10,
-                    fillColor: '#4285F4', // Google Maps blue
-                    fillOpacity: 0.8,
-                    strokeColor: 'white',
-                    strokeWeight: 2
-                }
-            });
+                        // Add a marker for user's current location
+                        addUserLocationMarker(userLocation);
 
-            // Create an InfoWindow (popup) for the user's location
-            const userInfoWindow = new google.maps.InfoWindow({
-                content: `
-                    <div class="info-window-content">
-                        <strong>Your Location</strong>
-                        <p>Latitude: ${latitude.toFixed(4)}</p>
-                        <p>Longitude: ${longitude.toFixed(4)}</p>
-                    </div>
-                `
-            });
+                        // Log success message to console
+                        console.log("User location detected:", userLocation);
+                    },
+                    // Error callback - handles geolocation failures
+                    function (error) {
+                        // Display error message based on error type
+                        let errorMessage = "Geolocation failed. Showing default location.";
+                        
+                        switch(error.code) {
+                            case error.PERMISSION_DENIED:
+                                errorMessage = "Permission denied. Using default location.";
+                                break;
+                            case error.POSITION_UNAVAILABLE:
+                                errorMessage = "Position unavailable. Using default location.";
+                                break;
+                            case error.TIMEOUT:
+                                errorMessage = "Geolocation timeout. Using default location.";
+                                break;
+                        }
 
-            // Show the InfoWindow when user clicks on the marker
-            userLocationMarker.addListener('click', () => {
-                // Close any previously opened InfoWindow
-                if (currentInfoWindow) {
-                    currentInfoWindow.close();
-                }
-                // Open new InfoWindow
-                userInfoWindow.open(map, userLocationMarker);
-                currentInfoWindow = userInfoWindow;
-            });
+                        // Log error to console for debugging
+                        console.log(errorMessage);
+                        
+                        // Show alert to user (optional - comment out if not desired)
+                        // alert(errorMessage);
 
-            // Log successful geolocation to console
-            console.log("Geolocation successful. User location:", userLocation);
-        }
-
-        // ========== GEOLOCATION ERROR HANDLER ==========
-        /**
-         * handleGeolocationError(error)
-         * Called when geolocation fails or is denied by user
-         * Falls back to default location (Tashkent)
-         * @param {PositionError} error - Error object describing what went wrong
-         */
-        function handleGeolocationError(error) {
-            // Log error details to console for debugging
-            if (error) {
-                console.warn("Geolocation failed:", error.message);
+                        // Map stays centered on default location
+                        map.setCenter({ lat: defaultLocation.lat, lng: defaultLocation.lng });
+                    },
+                    // Geolocation options
+                    {
+                        enableHighAccuracy: true,  // Request high accuracy if available
+                        timeout: 10000,             // 10 second timeout
+                        maximumAge: 0               // Don't use cached positions
+                    }
+                );
+            } else {
+                // Browser doesn't support geolocation API
+                console.log("Geolocation is not supported by this browser.");
+                alert("Your browser does not support geolocation.");
             }
-            
-            // Display alert to user
-            alert("Geolocation failed. Showing default location (Tashkent).");
-            
-            // Center map on default location
-            map.setCenter(DEFAULT_LOCATION);
-            map.setZoom(DEFAULT_ZOOM);
         }
 
-        // ========== ADD PHARMACY MARKERS ==========
+        // ============================================
+        // USER LOCATION MARKER
+        // ============================================
         /**
-         * addPharmacyMarkers()
-         * Dynamically creates markers for all pharmacies and adds them to the map
-         * Each marker shows pharmacy name and details in a popup
+         * Add a marker at the user's current location
+         * Uses a custom blue marker to distinguish from pharmacy markers
+         * @param {Object} location - Object with lat and lng properties
+         */
+        function addUserLocationMarker(location) {
+            // Remove previous user marker if it exists
+            if (userMarker) {
+                userMarker.setMap(null);
+            }
+
+            // Create custom SVG icon for user location (blue circle)
+            const userIcon = {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 10,
+                fillColor: "#4285F4",
+                fillOpacity: 1,
+                strokeColor: "#ffffff",
+                strokeWeight: 2
+            };
+
+            // Create marker for user's location
+            userMarker = new google.maps.Marker({
+                position: location,
+                map: map,
+                title: "Your Location",
+                icon: userIcon,
+                zIndex: 100  // Place user marker on top
+            });
+
+            // Create info window (popup) for user location
+            const userInfoWindow = new google.maps.InfoWindow({
+                content: "<div style='font-size: 14px; color: #333;'><b>📍 You are here</b></div>",
+                maxWidth: 200
+            });
+
+            // Open info window when user marker is clicked
+            userMarker.addListener("click", function () {
+                // Close all other info windows first
+                closeAllInfoWindows();
+                userInfoWindow.open(map, userMarker);
+            });
+
+            // Automatically open the info window for user location
+            userInfoWindow.open(map, userMarker);
+        }
+
+        // ============================================
+        // PHARMACY MARKERS
+        // ============================================
+        /**
+         * Add markers for all pharmacies to the map
+         * Each marker is clickable and displays pharmacy details in an info window
          */
         function addPharmacyMarkers() {
-            // Loop through each pharmacy in the pharmacies array
-            pharmacies.forEach((pharmacy) => {
-                // Create position object with latitude and longitude
-                const position = { lat: pharmacy.lat, lng: pharmacy.lng };
+            // Loop through each pharmacy in the array
+            pharmacies.forEach((pharmacy, index) => {
+                // Create custom SVG icon for pharmacies (green cross - pharmacy symbol)
+                const pharmacyIcon = {
+                    path: "M 0,-10 Q -10,-10 -10,0 Q -10,10 0,10 Q 10,10 10,0 Q 10,-10 0,-10 M -3,-5 L 3,-5 L 3,-3 L 5,-3 L 5,3 L 3,3 L 3,5 L -3,5 L -3,3 L -5,3 L -5,-3 L -3,-3 L -3,-5",
+                    scale: 1.2,
+                    fillColor: "#34a853",
+                    fillOpacity: 1,
+                    strokeColor: "#ffffff",
+                    strokeWeight: 2
+                };
 
-                // Create a marker for this pharmacy
+                // Create marker for the pharmacy
                 const marker = new google.maps.Marker({
-                    position: position,
+                    position: { lat: pharmacy.lat, lng: pharmacy.lng },
                     map: map,
-                    title: pharmacy.name, // Shows on hover
-                    // Use a red pin icon for pharmacies
-                    icon: {
-                        path: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6z",
-                        scale: 2.5,
-                        fillColor: '#EA4335', // Google Maps red
-                        fillOpacity: 0.9,
-                        strokeColor: 'white',
-                        strokeWeight: 1
-                    }
+                    title: pharmacy.name,
+                    icon: pharmacyIcon,
+                    animation: google.maps.Animation.DROP  // Animation when marker appears
                 });
 
-                // Create content for the InfoWindow (popup) when marker is clicked
-                const infoWindowContent = `
-                    <div class="info-window-content">
-                        <strong>${pharmacy.name}</strong>
-                        <p><strong>Hours:</strong> ${pharmacy.hours}</p>
-                        <p><strong>Description:</strong> ${pharmacy.description}</p>
-                        <p style="font-size: 12px; color: #888; margin-top: 8px;">
-                            📍 ${pharmacy.lat.toFixed(4)}, ${pharmacy.lng.toFixed(4)}
+                // Create HTML content for the info window (popup)
+                const infoContent = `
+                    <div style="font-family: Arial, sans-serif; width: 250px; padding: 10px;">
+                        <h3 style="margin: 0 0 10px 0; color: #2c3e50; font-size: 16px;">💊 ${pharmacy.name}</h3>
+                        <p style="margin: 5px 0; color: #555; font-size: 13px;">
+                            <b>Hours:</b> ${pharmacy.hours}
+                        </p>
+                        <p style="margin: 5px 0; color: #555; font-size: 13px;">
+                            <b>Info:</b> ${pharmacy.description}
+                        </p>
+                        <p style="margin: 10px 0 0 0; color: #999; font-size: 12px;">
+                            📍 Lat: ${pharmacy.lat.toFixed(4)}, Lng: ${pharmacy.lng.toFixed(4)}
                         </p>
                     </div>
                 `;
 
-                // Create InfoWindow object with pharmacy details
+                // Create info window for the pharmacy marker
                 const infoWindow = new google.maps.InfoWindow({
-                    content: infoWindowContent,
+                    content: infoContent,
                     maxWidth: 300
                 });
 
-                // Add click listener to marker to show InfoWindow
-                marker.addListener('click', () => {
-                    // Close any previously opened InfoWindow
-                    if (currentInfoWindow) {
-                        currentInfoWindow.close();
-                    }
-                    // Open new InfoWindow
-                    infoWindow.open(map, marker);
-                    // Store reference to current InfoWindow
-                    currentInfoWindow = infoWindow;
-                });
+                // Store info window for later reference
+                infoWindows.push(infoWindow);
 
-                // Optional: also open InfoWindow on hover for better UX
-                marker.addListener('mouseover', () => {
+                // Add click listener to marker to open its info window
+                marker.addListener("click", function () {
+                    // Close all other info windows first
+                    closeAllInfoWindows();
+                    // Open this marker's info window
                     infoWindow.open(map, marker);
                 });
 
-                marker.addListener('mouseout', () => {
-                    // Uncomment line below to close on mouseout
-                    // infoWindow.close();
-                });
+                // Store marker reference for potential future manipulation
+                pharmacyMarkers.push(marker);
             });
-
-            // Log to console that markers have been added
-            console.log(`Added ${pharmacies.length} pharmacy markers to the map`);
         }
+
+        // ============================================
+        // UTILITY FUNCTIONS
+        // ============================================
+        /**
+         * Close all open info windows on the map
+         * Used to ensure only one popup is open at a time
+         */
+        function closeAllInfoWindows() {
+            // Loop through all stored info windows and close them
+            infoWindows.forEach(function (infoWindow) {
+                infoWindow.close();
+            });
+        }
+
+        // ============================================
+        // RESPONSIVE MAP RESIZE
+        // ============================================
+        /**
+         * Handle map resizing when window is resized
+         * Ensures map remains responsive on different screen sizes
+         */
+        window.addEventListener("resize", function () {
+            // Trigger map resize event to recalculate dimensions
+            if (map) {
+                google.maps.event.trigger(map, "resize");
+            }
+        });
+
     </script>
 </body>
 </html>
